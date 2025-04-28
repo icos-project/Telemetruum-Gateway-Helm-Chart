@@ -1,0 +1,89 @@
+extensions:
+  health_check:
+    endpoint: "0.0.0.0:13133"
+    check_collector_pipeline:
+      enabled: false
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: ${env:MY_POD_IP}:4317
+      http:
+        endpoint: ${env:MY_POD_IP}:4318
+
+processors:
+  batch: {}
+  memory_limiter:
+    check_interval: 5s
+    limit_percentage: 80
+    spike_limit_percentage: 25
+  {{- if .Values.agentId }}
+  attributes/icos_agent_id:
+    # insert only if it does not exists
+    # use "icos_agent_id" and not "icos.agent.id" because metrics received from prometheus will already
+    # have icos_agent_id and it will not be recognized as icos.agent.id
+    actions:
+    - action: insert
+      key: icos_agent_id
+      value: {{ tpl .Values.agentId . }}
+  {{- end }}
+
+exporters:
+  debug:
+    verbosity: basic
+  {{- if .Values.telemetruumHubEndpoint }}
+  otlphttp/tlum-hub:
+    {{- if regexMatch "^http.?://" (tpl .Values.telemetruumHubEndpoint .)  }}
+    endpoint: {{ tpl .Values.telemetruumHubEndpoint . }}
+    {{- else }}
+    endpoint: http://{{ tpl .Values.telemetruumHubEndpoint . }}
+    {{- end }}
+    tls:
+      include_system_ca_certs_pool: true
+      insecure: false
+  {{- end }}
+  {{- if .Values.telemetruumGRPCHubEndpoint }}
+  otlp/tlum-hub:
+    endpoint: {{ tpl .Values.telemetruumGRPCHubEndpoint . }}
+    tls:
+      insecure: true
+  {{- end }}
+service:
+  extensions:
+    - health_check
+  pipelines:
+    metrics:
+      receivers:
+        - otlp
+      processors:
+        - memory_limiter
+        - batch
+        {{- if .Values.agentId }}
+        - attributes/icos_agent_id
+        {{- end }}
+      exporters:
+        - debug
+        {{- if .Values.telemetruumHubEndpoint }}
+        - otlphttp/tlum-hub
+        {{- end }}
+        {{- if .Values.telemetruumGRPCHubEndpoint }}
+        - otlp/tlum-hub
+        {{- end }}
+    logs:
+      receivers:
+        - otlp
+      processors:
+        - memory_limiter
+        - batch
+        {{- if .Values.agentId }}
+        - attributes/icos_agent_id
+        {{- end }}
+      exporters:
+        - debug
+        {{- if .Values.telemetruumHubEndpoint }}
+        - otlphttp/tlum-hub
+        {{- end }}
+        {{- if .Values.telemetruumGRPCHubEndpoint }}
+        - otlp/tlum-hub
+        {{- end }}

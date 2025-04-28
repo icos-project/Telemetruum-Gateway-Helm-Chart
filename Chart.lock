@@ -1,0 +1,6 @@
+dependencies:
+- name: resengit-common
+  repository: oci://harbor.res.eng.it/resengit/helm
+  version: 0.9.1
+digest: sha256:a0427f8d994e4f02390668d3c4ec529d51959d74766c0d3abf9eb818076ffa4e
+generated: "2024-07-15T22:12:24.883749042+02:00"
